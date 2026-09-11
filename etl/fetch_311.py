@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 import requests
 import psycopg2
 from psycopg2.extras import execute_values
-
+from dotenv import load_dotenv
+load_dotenv()
 SOCRATA_ENDPOINT = "https://data.cityofnewyork.us/resource/erm2-nwe9.json"
 PAGE_SIZE = int(os.environ.get("PAGE_SIZE", 5000))
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", 365))
