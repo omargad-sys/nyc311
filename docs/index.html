@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NYC311 Pulse: SQL and Power BI analysis of NYC service requests</title>
+<meta name="description" content="A relational-database and Power BI case study built on NYC 311 service request data. SQL, Python ETL, GitHub Actions, and data visualization.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF0EC;
+    --panel: #F7F8F5;
+    --ink: #12181F;
+    --ink-soft: #4A5560;
+    --civic-blue: #0033A0;
+    --civic-blue-dark: #00256E;
+    --signal-amber: #C67F00;
+    --line: #D8DCD6;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.55;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  a { color: var(--civic-blue); }
+
+  /* ---------- Hero / ticket header ---------- */
+  header.hero {
+    border-bottom: 1px solid var(--line);
+    padding: 56px 0 40px;
+  }
+
+  .ticket-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    margin-bottom: 20px;
+  }
+
+  .ticket-meta span strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 3px 11px;
+    border-radius: 3px;
+    background: var(--civic-blue);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: clamp(2.1rem, 5vw, 3rem);
+    line-height: 1.08;
+    font-weight: 800;
+    margin: 0 0 16px;
+    letter-spacing: -0.01em;
+  }
+
+  .lede {
+    font-size: 1.15rem;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 0;
+  }
+
+  /* ---------- Sections ---------- */
+  section {
+    padding: 44px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  section:last-of-type { border-bottom: none; }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 18px;
+  }
+
+  p { margin: 0 0 14px; }
+
+  /* ---------- Pipeline steps ---------- */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 8px;
+  }
+
+  .pipeline-step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 16px;
+    padding: 14px 0;
+    position: relative;
+  }
+
+  .pipeline-step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 42px;
+    bottom: -14px;
+    width: 2px;
+    background: var(--line);
+  }
+
+  .pipeline-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--civic-blue);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  .pipeline-step h3 {
+    font-size: 1.02rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+
+  .pipeline-step p {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin: 0;
+  }
+
+  /* ---------- Data model ---------- */
+  .model {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .model-box {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+
+  .model-box.fact {
+    border-color: var(--civic-blue);
+    grid-column: 1 / -1;
+  }
+
+  .model-box .label {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+
+  .model-box .name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  /* ---------- Stat callout ---------- */
+  .stat-callout {
+    background: var(--panel);
+    border-left: 3px solid var(--signal-amber);
+    padding: 22px 24px;
+    border-radius: 2px;
+  }
+
+  .stat-callout .num {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: var(--civic-blue-dark);
+    line-height: 1;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .stat-callout p {
+    color: var(--ink-soft);
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  /* ---------- Dashboard embed ---------- */
+  .embed-frame {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--panel);
+    aspect-ratio: 16 / 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+
+  /* Once you have a Power BI "Publish to web" link, replace the div above
+     with something like:
+     <iframe class="embed-frame" src="YOUR_PUBLISH_TO_WEB_URL" frameborder="0" allowFullScreen="true"></iframe>
+  */
+
+  /* ---------- Tech stack chips ---------- */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    font-size: 0.85rem;
+    padding: 6px 13px;
+    border-radius: 3px;
+  }
+
+  /* ---------- Footer ---------- */
+  footer {
+    padding: 36px 0 56px;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+
+  footer a { margin-right: 18px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="ticket-meta">
+      <span>Service request no. <strong>NYC311-PULSE-01</strong></span>
+      <span>Filed <strong id="filed-date">2026</strong></span>
+      <span class="status-pill" id="status-pill">In progress</span>
+    </div>
+    <h1>Where does NYC's 311 system fall behind?</h1>
+    <p class="lede">
+      A relational database and Power BI dashboard built on real NYC 311
+      service request data, with an automated Python and SQL pipeline behind it.
+    </p>
+  </header>
+
+  <section>
+    <h2>The question</h2>
+    <p>
+      NYC's 311 line handles millions of service requests a year, everything
+      from noise complaints to broken streetlights. Response times vary a lot
+      by agency, borough, and complaint type, but that variation is buried in
+      raw city data. This project turns it into something a decision maker
+      could actually act on.
+    </p>
+    <p>
+      <em>Replace this paragraph with your specific question once you've
+      explored the data, for example: which agency misses its own response
+      time the most, or which neighborhoods wait longest for the same complaint type.</em>
+    </p>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <div class="pipeline">
+      <div class="pipeline-step">
+        <div class="pipeline-num">1</div>
+        <div>
+          <h3>Pull</h3>
+          <p>A Python script calls the NYC Open Data (Socrata) API for 311 requests.</p>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-num">2</div>
+        <div>
+          <h3>Automate</h3>
+          <p>A scheduled GitHub Actions workflow runs that script weekly, no manual step required.</p>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-num">3</div>
+        <div>
+          <h3>Model</h3>
+          <p>Data lands in a PostgreSQL star schema: one fact table, four dimension tables.</p>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-num">4</div>
+        <div>
+          <h3>Analyze</h3>
+          <p>SQL with CTEs and window functions answers questions like agency ranking and month over month change.</p>
+        </div>
+      </div>
+      <div class="pipeline-step">
+        <div class="pipeline-num">5</div>
+        <div>
+          <h3>Visualize</h3>
+          <p>Power BI connects to the database directly and models relationships, DAX measures, and the dashboard below.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Data model</h2>
+    <div class="model">
+      <div class="model-box fact">
+        <div class="label">Fact table</div>
+        <div class="name">fact_311_requests</div>
+      </div>
+      <div class="model-box">
+        <div class="label">Dimension</div>
+        <div class="name">dim_agency</div>
+      </div>
+      <div class="model-box">
+        <div class="label">Dimension</div>
+        <div class="name">dim_complaint_type</div>
+      </div>
+      <div class="model-box">
+        <div class="label">Dimension</div>
+        <div class="name">dim_borough</div>
+      </div>
+      <div class="model-box">
+        <div class="label">Dimension</div>
+        <div class="name">dim_date</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Key finding</h2>
+    <div class="stat-callout">
+      <span class="num">XX%</span>
+      <p>
+        Fill this in once you've run the analysis. A specific number
+        beats a general claim, for example a percentage gap between the
+        slowest and fastest agency, or a resolution-time trend over time.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Live dashboard</h2>
+    <p>
+      Published from Power BI using "Publish to web." Replace the block below
+      with the iframe embed code Power BI gives you.
+    </p>
+    <div class="embed-frame">Power BI embed goes here</div>
+  </section>
+
+  <section>
+    <h2>Tech stack</h2>
+    <div class="chips">
+      <span class="chip">SQL</span>
+      <span class="chip">PostgreSQL</span>
+      <span class="chip">Relational database design</span>
+      <span class="chip">Star schema data modeling</span>
+      <span class="chip">Python</span>
+      <span class="chip">ETL pipeline</span>
+      <span class="chip">Power BI</span>
+      <span class="chip">DAX</span>
+      <span class="chip">Data visualization</span>
+      <span class="chip">GitHub Actions</span>
+      <span class="chip">CI/CD automation</span>
+      <span class="chip">REST API integration</span>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/YOUR-USERNAME/nyc311-pulse">GitHub repo</a>
+    <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9">Data source</a>
+  </footer>
+
+</div>
+
+</body>
+</html>
