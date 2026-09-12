@@ -67,23 +67,13 @@ FROM ranked
 WHERE rn <= 3
 ORDER BY borough, rn;
 
-
--- 4. SLA compliance: share of requests each agency closed within 3 days.
-WITH sla_flagged AS (
-    SELECT
-        a.agency_name,
-        f.unique_key,
-        CASE WHEN f.resolution_hours <= 72 THEN 1 ELSE 0 END AS closed_within_sla
-    FROM fact_311_requests f
-    JOIN dim_agency a ON a.agency_code = f.agency_code
-    WHERE f.resolution_hours IS NOT NULL
-)
+ -- 4. SLA compliance: share of requests each agency closed within 72 hours.
 SELECT
     agency_name,
-    COUNT(*) AS total_closed,
-    SUM(closed_within_sla) AS closed_within_3_days,
-    ROUND(100.0 * SUM(closed_within_sla) / COUNT(*), 1) AS sla_compliance_pct
-FROM sla_flagged
-GROUP BY agency_name
-HAVING COUNT(*) >= 100
-ORDER BY sla_compliance_pct ASC;
+    ROUND(AVG(CASE WHEN resolution_hours <= 72 THEN 1 ELSE 0 END) * 100, 1) AS pct_within_72hrs
+FROM dim_agency
+JOIN fact_311_requests ON dim_agency.agency_code = fact_311_requests.agency_code
+WHERE resolution_hours IS NOT NULL
+GROUP BY agency_name, fact_311_requests.agency_code
+ORDER BY pct_within_72hrs DESC;
+

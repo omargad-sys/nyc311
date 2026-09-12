@@ -60,7 +60,7 @@ def parse_row(row: dict) -> dict:
         "closed_date": closed,
         "agency_code": row.get("agency"),
         "agency_name": row.get("agency_name") or row.get("agency"),
-        "complaint_type": row.get("complaint_type"),
+        "complaint_type": row.get("complaint_type", "").strip().upper() or None,
         "descriptor": row.get("descriptor"),
         "borough": row.get("borough"),
         "status": row.get("status"),
